@@ -65,7 +65,9 @@ class NT8BookingDetailsAdminFinalizeForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    $tnc_url = if (!UrlHelper::isValid($tnc_url)) {
+    $tnc_url = $form_state->getValue('tnc_url');
+
+    if (!UrlHelper::isValid($tnc_url)) {
       $form_state->setErrorByName('tnc_url', t('Invalid URL'));
     }
   }
