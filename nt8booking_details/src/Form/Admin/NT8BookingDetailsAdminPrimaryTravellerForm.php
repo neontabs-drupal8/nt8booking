@@ -2,25 +2,36 @@
 
 namespace Drupal\nt8booking_details\Form\Admin;
 
-use Drupal\Core\Ajax\AjaxResponse;
-use Drupal\Core\Ajax\HtmlCommand;
-use Drupal\Core\Ajax\InvokeCommand;
-use Drupal\Core\Form\FormBase;
+use Drupal;
+use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Datetime\DrupalDateTime;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\nt8tabsio\Service\NT8TabsRestService;
-use Drupal\nt8booking_enquiry\Service\NT8BookingService;
-use Drupal\nt8booking_enquiry\Event\NT8BookingEvent;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * The booking path details form.
  */
-class NT8BookingDetailsAdminPrimaryTravellerForm extends FormBase {
+class NT8BookingDetailsAdminPrimaryTravellerForm extends ConfigFormBase {
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormId() {
+    return __CLASS__;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames(): array {
+    return [
+      'nt8booking_details.settings',
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $config = \Drupal::config('nt8booking_details.settings');
+    $config = $this->config('nt8booking_details.settings');
 
     $titles_list = $config->get('titles_list');
     $other_code = $config->get('other_code');
@@ -53,22 +64,12 @@ class NT8BookingDetailsAdminPrimaryTravellerForm extends FormBase {
       '#description' => t('Select the default age bracket for on the party details screen.'),
     );
 
-    $form['actions']['#type'] = 'actions';
-    $form['actions']['submit'] = [
-      '#type' => 'submit',
-      '#value' => $this->t('Save Settings'),
-      '#button_type' => 'primary',
-    ];
-
-    $form['#cache'] = ['max-age' => 0];
-
-    return $form;
+    return parent::buildForm($form, $form_state);
   }
 
-  public function getFormId() {
-    return __CLASS__;
-  }
-
+  /**
+   * {@inheritdoc}
+   */
   public function validateForm(array &$form, FormStateInterface $form_state) {
     $titles_list = $form_state->getValue('titles_list');
 
@@ -78,21 +79,21 @@ class NT8BookingDetailsAdminPrimaryTravellerForm extends FormBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $titles_list = $form_state->getValue('titles_list');
-    \Drupal::configFactory()->getEditable('nt8booking_details.settings')
-      ->set('titles_list', $titles_list)
-      ->save();
-
     $other_code = $form_state->getValue('other_code');
-    \Drupal::configFactory()->getEditable('nt8booking_details.settings')
-      ->set('other_code', $other_code)
-      ->save();
-
     $default_age = $form_state->getValue('default_age');
-    \Drupal::configFactory()->getEditable('nt8booking_details.settings')
+
+    $config = $this->config('nt8booking_details.settings')
+      ->set('titles_list', $titles_list)
+      ->set('other_code', $other_code)
       ->set('default_age', $default_age)
       ->save();
+
+    parent::submitForm($form, $form_state);
   }
 
 }

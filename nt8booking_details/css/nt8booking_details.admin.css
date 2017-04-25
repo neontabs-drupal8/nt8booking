@@ -1,0 +1,10 @@
+#edit-nt2-booking-details-admin-extras .js-form-type-checkbox {
+    float: left;
+    width: 300px;
+}
+
+#edit-nt2-booking-details-admin-extras  .fieldset-wrapper {
+    clear: both;
+    float: left;
+    background: blueviolet;
+}

@@ -2,22 +2,17 @@
 
 namespace Drupal\nt8booking_details\Form\Admin;
 
-use Drupal\Core\Ajax\AjaxResponse;
-use Drupal\Core\Ajax\HtmlCommand;
-use Drupal\Core\Ajax\InvokeCommand;
-use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Datetime\DrupalDateTime;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\nt8tabsio\Service\NT8TabsRestService;
 use Drupal\nt8booking_enquiry\Service\NT8BookingService;
-use Drupal\nt8booking_enquiry\Event\NT8BookingEvent;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Drupal\nt8tabsio\Service\NT8TabsRestService;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * The booking path details form.
  */
-class NT8BookingDetailsAdminExtrasForm extends FormBase {
+class NT8BookingDetailsAdminExtrasForm extends ConfigFormBase {
+
   /**
    * Instance of NT8TabsRestService.
    *
@@ -28,7 +23,7 @@ class NT8BookingDetailsAdminExtrasForm extends FormBase {
   /**
    * Instance of NT8BookingService.
    *
-   * @var \Drupal\nt8booking_enquiry\Service\NT8BookingService
+   * @var NT8BookingService
    */
   protected $nt8bookingService;
 
@@ -50,26 +45,45 @@ class NT8BookingDetailsAdminExtrasForm extends FormBase {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormId() {
+    return __CLASS__;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames(): array {
+    return [
+      'nt8booking_details.settings',
+    ];
+  }
+
   public function buildForm(array $form, FormStateInterface $form_state) {
+    $config = $this->config('nt8booking_details.settings');
+
+    $attr_pets = $config->get('attr_pets');
+    $extras_pets = $config->get('extras_pets');
+    $extras = $config->get('extras');
 
     // Get all attributes as $options.
     $this->nt8TabsRestService->setSuperDebug(TRUE);
-    $api_info = $this->nt8TabsRestService->get('/');
-    $all_atts = json_decode($api_info['constants']['attributes']);
-    $attr_ops = [];
+    $api_info_string = $this->nt8TabsRestService->get('/');
+    $api_info = json_decode($api_info_string, TRUE);
+    $all_atts = $api_info['constants']['attributes'];
+    $attr_ops = ['none' => '--'];
     foreach ($all_atts as $value) {
+      $code = $value['code'];
+      $lab = $value['label'];
       $attr_ops[$value['code']] = t(
-        '[!cod] !lab', array('!cod' => $value['code'], '!lab' => $value['label'])
+        '[:cod] :lab', array(':cod' => $code, ':lab' => $lab)
       );
     }
 
-    return $form;
-
     // Which of the extras are web bookable.
-//    $css = drupal_get_path('module', 'nt2_booking_details') . '/css/admin.css';
-//    drupal_add_css($css);
     $all_extras = $api_info['constants']['extras'];
-    $cb_webextras = [];
     foreach ($all_extras as $extra) {
       $code = $extra['code'];
       $label = $extra['label'];
@@ -83,35 +97,30 @@ class NT8BookingDetailsAdminExtrasForm extends FormBase {
       '#title' => t('Pets Overrides'),
     ];
 
-    $form['pets']['nt2_booking_details_admin_attr_pets'] = [
+    $form['pets']['attr_pets'] = [
       '#type' => 'select',
       '#options' => $attr_ops,
       '#description' => t('Which attribute indicates the max number of pets on a property.'),
-      // '#default_value' => variable_get('nt2_booking_details_admin_attr_pets', ''),
+      '#default_value' => $attr_pets,
     ];
 
-    $form['pets']['nt2_booking_details_admin_extras_pets'] = [
+    $form['pets']['extras_pets'] = [
       '#type' => 'select',
-      '#options' => $cb_webextras,
+      '#options' => array_merge(['none' => '--'], $cb_webextras),
       '#description' => t('Which extra is the pet extra.'),
-      // '#default_value' => variable_get('nt2_booking_details_admin_extras_pets', ''),
+      '#default_value' => $extras_pets,
     ];
 
     $form['extras'] = [
       '#type' => 'fieldset',
       '#title' => t('Which extras should be web bookable'),
+      '#description' => t('Select which extras should appear on the booking form.'),
     ];
 
-    $form['extras']['nt2_booking_details_admin_extras'] = [
+    $form['extras']['extras'] = [
       '#type' => 'checkboxes',
       '#options' => $cb_webextras,
-      '#description' => t('Select which extras should appear on the booking form.'),
-      //'#default_value' => variable_get('nt2_booking_details_admin_extras', array()),
-    ];
-
-    $form['extras']['apply'] = [
-      '#type' => 'submit',
-      '#default_value' => t('Apply Changes'),
+      '#default_value' => $extras,
     ];
 
     $form['extras']['desc'] = [
@@ -129,47 +138,55 @@ class NT8BookingDetailsAdminExtrasForm extends FormBase {
     $attributes = $api_info['constants']['attributes'];
     array_multisort($attributes);
 
-    // $sel = variable_get('nt2_booking_details_admin_extras', array());
     foreach ($cb_webextras as $code => $label) {
-      if (isset($sel[$code]) && $sel[$code]) {
+      if (isset($extras[$code]) && $extras[$code]) {
         // We need to build a custom key for each of the extras.
         $attrs = array('false' => '-- use global --');
         foreach ($attributes as $attr) {
-          $attrs[$attr->getCode()] = format_string(
-            '!label (@code)', ['!label' => $attr->getLabel(), '@code' => $attr->getCode()]
+          $attrs[$attr['code']] = format_string(
+            ':label (:code)', [':label' => $attr['label'], ':code' => $attr['code']]
           );
         }
 
-        $varname = 'nt2_booking_details_admin_extras_override_' . $code;
-        $default = variable_get($varname, '');
+        $varname = 'extras_override_' . $code;
+        $default = $config->get($varname);
         $form['attr'][$varname] = [
           '#type' => 'select',
           '#title' => $label,
           '#options' => $attrs,
           '#default_value' => $default,
         ];
-        variable_set($varname, $default);
+        // variable_set($varname, $default);
       }
     }
 
-    $form['actions']['#type'] = 'actions';
-    $form['actions']['submit'] = [
-      '#type' => 'submit',
-      '#value' => $this->t('Save Settings'),
-      '#button_type' => 'primary',
-    ];
+    $form['#attached'] = array(
+      'library' => array('nt8booking_details/nt8booking-details-admin'),
+    );
 
-    $form['#cache'] = ['max-age' => 0];
-
-    return $form;
+    return parent::buildForm($form, $form_state);
   }
 
-  public function getFormId() {
-    return __CLASS__;
-  }
 
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    $attr_pets = $form_state->getValue('attr_pets');
+    $extras_pets = $form_state->getValue('extras_pets');
+    $extras = $form_state->getValue('extras');
 
+    $this->config('nt8booking_details.settings')
+      ->set('attr_pets', $attr_pets)
+      ->set('extras_pets', $extras_pets)
+      ->set('extras', $extras)
+      ->save();
+
+    $all_values = $form_state->getValues();
+    foreach ($all_values as $key => $val) {
+      if (strpos($key, 'extras_override_') === 0) {
+        $this->config('nt8booking_details.settings')->set($key, $val)->save();
+      }
+    }
+
+    parent::submitForm($form, $form_state);
   }
 
 }

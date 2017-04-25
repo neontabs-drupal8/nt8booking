@@ -5,7 +5,7 @@ namespace Drupal\nt8booking_enquiry\Form;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\Core\Ajax\InvokeCommand;
-use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -17,7 +17,23 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 /**
  * The booking path details form.
  */
-class NT8BookingEnquiryAdminForm extends FormBase {
+class NT8BookingEnquiryAdminForm extends ConfigFormBase {
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormId() {
+    return __CLASS__;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames(): array {
+    return [
+      'nt8booking_enquiry.settings',
+    ];
+  }
 
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = \Drupal::config('nt8booking_enquiry.settings');
@@ -39,20 +55,7 @@ class NT8BookingEnquiryAdminForm extends FormBase {
       '#default_value' => json_encode(json_decode($error_codes), JSON_PRETTY_PRINT),
     ];
 
-    $form['actions']['#type'] = 'actions';
-    $form['actions']['submit'] = [
-      '#type' => 'submit',
-      '#value' => $this->t('Save Settimgs'),
-      '#button_type' => 'primary',
-    ];
-
-    $form['#cache'] = ['max-age' => 0];
-
-    return $form;
-  }
-
-  public function getFormId() {
-    return __CLASS__;
+    return parent::buildForm($form, $form_state);
   }
 
   public function validateForm(array &$form, FormStateInterface $form_state) {
@@ -66,14 +69,14 @@ class NT8BookingEnquiryAdminForm extends FormBase {
 
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $error_codes = $form_state->getValue('error_codes');
-    \Drupal::configFactory()->getEditable('nt8booking_enquiry.settings')
-      ->set('error_codes', $error_codes)
-      ->save();
-
     $lead_time = $form_state->getValue('lead_time');
-    \Drupal::configFactory()->getEditable('nt8booking_enquiry.settings')
+
+    $config = $this->config('nt8booking_details.settings')
+      ->set('error_codes', $error_codes)
       ->set('lead_time', $lead_time)
       ->save();
+
+    parent::submitForm($form, $form_state);
   }
 
 }

@@ -2,25 +2,19 @@
 
 namespace Drupal\nt8booking_details\Form\Admin;
 
-use Drupal\Core\Ajax\AjaxResponse;
-use Drupal\Core\Ajax\HtmlCommand;
-use Drupal\Core\Ajax\InvokeCommand;
-use Drupal\Core\Form\FormBase;
+use Drupal;
+use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Datetime\DrupalDateTime;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\nt8tabsio\Service\NT8TabsRestService;
-use Drupal\nt8booking_enquiry\Service\NT8BookingService;
-use Drupal\nt8booking_enquiry\Event\NT8BookingEvent;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use function GuzzleHttp\json_decode;
+use function GuzzleHttp\json_encode;
 
 /**
  * The booking path details form.
  */
-class NT8BookingDetailsAdminPartyDetailsForm extends FormBase {
+class NT8BookingDetailsAdminPartyDetailsForm extends ConfigFormBase {
 
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $config = \Drupal::config('nt8booking_details.settings');
+    $config = $this->config('nt8booking_details.settings');
 
     $adult_ages = $config->get('adult_ages');
     $child_ages = $config->get('child_ages');
@@ -50,17 +44,16 @@ class NT8BookingDetailsAdminPartyDetailsForm extends FormBase {
       '#description' => t('JSON encoded array of age bands for adults.'),
     );
 
+    return parent::buildForm($form, $form_state);
+  }
 
-    $form['actions']['#type'] = 'actions';
-    $form['actions']['submit'] = [
-      '#type' => 'submit',
-      '#value' => $this->t('Save Settings'),
-      '#button_type' => 'primary',
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames(): array {
+    return [
+      'nt8booking_details.settings',
     ];
-
-    $form['#cache'] = ['max-age' => 0];
-
-    return $form;
   }
 
   public function getFormId() {
@@ -89,19 +82,16 @@ class NT8BookingDetailsAdminPartyDetailsForm extends FormBase {
 
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $adult_ages = $form_state->getValue('adult_ages');
-    \Drupal::configFactory()->getEditable('nt8booking_details.settings')
-      ->set('adult_ages', $adult_ages)
-      ->save();
-
     $child_ages = $form_state->getValue('child_ages');
-    \Drupal::configFactory()->getEditable('nt8booking_details.settings')
-      ->set('child_ages', $child_ages)
-      ->save();
-
     $infant_ages = $form_state->getValue('infant_ages');
-    \Drupal::configFactory()->getEditable('nt8booking_details.settings')
+
+    $config = $this->config('nt8booking_details.settings')
+      ->set('adult_ages', $adult_ages)
+      ->set('child_ages', $child_ages)
       ->set('infant_ages', $infant_ages)
       ->save();
+
+    parent::submitForm($form, $form_state);
   }
 
 }
